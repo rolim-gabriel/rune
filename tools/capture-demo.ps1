@@ -524,7 +524,10 @@ function Invoke-Take([int]$TakeNumber) {
     # nothing, and this repo's own path contains one ("...\code\pdf reader").
     # Unquoted, App.xaml.cs receives a truncated path, File.Exists fails and it
     # silently opens the start page instead of the document.
-    $exeArgs = @(('"' + $pdfPath + '"'), '--page', $Page, '--zoom', $Zoom)
+    # --new-window, because Rune is single-instance: without it a Rune already
+    # open on this desktop would take the file and this process would exit
+    # before it ever had a window to film.
+    $exeArgs = @(('"' + $pdfPath + '"'), '--page', $Page, '--zoom', $Zoom, '--new-window')
     $proc = Start-Process -FilePath $Exe -ArgumentList $exeArgs -PassThru
 
     try {

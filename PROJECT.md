@@ -460,8 +460,10 @@ label on 20-odd icon-only buttons.
 # Build
 dotnet build src/Rune.App/Rune.App.csproj -p:Platform=x64
 
-# Run (accepts an optional PDF path; also --page N --zoom Z for scripted tests)
-src/Rune.App/bin/x64/Debug/net10.0-windows10.0.19041.0/win-x64/Rune.exe [file.pdf]
+# Run (accepts an optional PDF path; also --page N --zoom Z for scripted tests).
+# Rune is single-instance: a second launch hands its file to the running window
+# as a new tab and exits (Services/SingleInstance.cs). --new-window opts out.
+src/Rune.App/bin/x64/Debug/net10.0-windows10.0.19041.0/win-x64/Rune.exe [file.pdf] [--new-window]
 
 # Test (427 tests)
 dotnet test tests/Rune.Tests/Rune.Tests.csproj

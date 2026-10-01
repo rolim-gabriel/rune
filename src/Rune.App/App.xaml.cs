@@ -30,6 +30,66 @@ public partial class App : Application
             ErrorLog.Default.Write("UnobservedTaskException", e.Exception);
             e.SetObserved();
         };
+
+        // Another Rune.exe (Explorer opening a PDF) handed us its file.
+        SingleInstance.ActivationQueued += DrainRedirectedActivations;
+    }
+
+    /// <summary>
+    /// 1 while a drain is scheduled or running. Each hand-over awaits its
+    /// document load, so without this two drains could interleave on the
+    /// dispatcher and a --page meant for one file could land on the other's
+    /// tab. One drain at a time keeps arrival order.
+    /// </summary>
+    private static int _drainScheduled;
+
+    /// <summary>
+    /// Moves queued hand-overs from other processes onto the UI thread and
+    /// opens them as tabs, one after another. Called from a pool thread when
+    /// one arrives, and once from OnLaunched for anything that arrived before
+    /// the window did. Dequeuing happens only on the dispatcher, so nothing is
+    /// opened twice.
+    /// </summary>
+    private static void DrainRedirectedActivations()
+    {
+        if (MainWindow is not MainWindow window)
+        {
+            return; // OnLaunched drains the queue once there is a window
+        }
+
+        if (Interlocked.Exchange(ref _drainScheduled, 1) != 0)
+        {
+            return; // the running drain will pick this one up, or re-arm below
+        }
+
+        window.DispatcherQueue.TryEnqueue(async () =>
+        {
+            try
+            {
+                while (SingleInstance.Pending.TryDequeue(out var request))
+                {
+                    try
+                    {
+                        await window.HandleActivationAsync(request);
+                    }
+                    catch (Exception ex)
+                    {
+                        ErrorLog.Default.Write("RedirectedActivation", ex);
+                        ReportToUser(ex.Message);
+                    }
+                }
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _drainScheduled, 0);
+                // A hand-over that arrived after the loop saw an empty queue
+                // but before the flag dropped was turned away above.
+                if (!SingleInstance.Pending.IsEmpty)
+                {
+                    DrainRedirectedActivations();
+                }
+            }
+        });
     }
 
     /// <summary>
@@ -63,26 +123,19 @@ public partial class App : Application
 
         window.Activate();
 
-        // Support "Rune.exe <file.pdf> [--page N] [--zoom Z]" — the file path
-        // is how Explorer launches the default handler once file association
-        // lands (M6); --page/--zoom are for scripted testing.
-        string[] commandLine = Environment.GetCommandLineArgs();
-        if (commandLine.Length > 1 && File.Exists(commandLine[1]))
+        // "Rune.exe <file.pdf> [--page N] [--zoom Z] [--new-window]" — the file
+        // path is how Explorer launches the default handler; --page/--zoom are
+        // for scripted testing. SingleInstance parsed it before XAML started,
+        // from the activation args (Store file association) or the command
+        // line (portable exe).
+        var initial = SingleInstance.Initial;
+        if (initial.HasPaths)
         {
-            int? page = null;
-            double? zoom = null;
-            for (int i = 2; i < commandLine.Length - 1; i++)
-            {
-                if (commandLine[i] == "--page" && int.TryParse(commandLine[i + 1], out int p))
-                {
-                    page = p;
-                }
-                if (commandLine[i] == "--zoom" && double.TryParse(commandLine[i + 1], out double z))
-                {
-                    zoom = z;
-                }
-            }
-            await window.LoadDocumentAsync(commandLine[1], page, zoom);
+            await window.OpenFromLaunchAsync(initial);
         }
+
+        // Files that other processes handed over while this window was still
+        // being built.
+        DrainRedirectedActivations();
     }
 }
