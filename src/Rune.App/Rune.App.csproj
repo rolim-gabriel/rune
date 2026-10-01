@@ -21,6 +21,9 @@
     <AppxSymbolPackageEnabled>false</AppxSymbolPackageEnabled>
     <UseWinUI>true</UseWinUI>
     <EnableMsixTooling>true</EnableMsixTooling>
+    <!-- Program.cs supplies Main, so the single-instance check (Explorer
+         opening a PDF into the running window) can run before XAML starts. -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
     <!-- Default: unpackaged self-contained exe (dev + portable zip).
          Release MSIX overrides on the command line: -p:WindowsPackageType=MSIX -->
     <WindowsPackageType Condition="'$(WindowsPackageType)' == ''">None</WindowsPackageType>
