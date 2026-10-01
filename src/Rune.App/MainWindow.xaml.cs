@@ -73,6 +73,7 @@ public sealed partial class MainWindow : Window
             new PointerEventHandler(Tabs_PointerPressed), handledEventsToo: true);
 
         PopulateRecents();
+        ApplySavedPlacement();
 
         Activated += MainWindow_FirstActivated;
         Closed += MainWindow_Closed;
@@ -266,6 +267,7 @@ public sealed partial class MainWindow : Window
             OpenPaths = openPaths,
             ActiveIndex = Math.Max(0, Tabs.SelectedIndex),
         };
+        CapturePlacement();
         _store.Save(_state);
         _thumbnails.Dispose(); // stops the homepage cache's PDFium thread
     }
