@@ -164,6 +164,9 @@ public sealed class AppState
     public SessionState Session { get; set; } = new();
     public AppSettings Settings { get; set; } = new();
 
+    /// <summary>Main window bounds at last close; null until Rune has been closed once.</summary>
+    public WindowPlacement? Window { get; set; }
+
     public const int MaxRecents = 30;
 
     public RecentFile? FindRecent(string path) =>
